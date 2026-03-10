@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write Up — Strings: very-baby | ADBCTF</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #0d1117;
+    --bg3: #161b22;
+    --border: #21262d;
+    --green: #39d353;
+    --green-dim: #26a641;
+    --cyan: #58d7f7;
+    --yellow: #f0e040;
+    --red: #ff4c4c;
+    --white: #e6edf3;
+    --muted: #768390;
+    --accent: #1f6feb;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 17px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Noise texture */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 0 0 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header-bg {
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 80% 60% at 50% -20%, rgba(57,211,83,0.12) 0%, transparent 60%),
+      linear-gradient(180deg, rgba(31,111,235,0.06) 0%, transparent 100%);
+  }
+
+  .header-grid {
+    position: absolute;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(57,211,83,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(57,211,83,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);
+  }
+
+  .header-inner {
+    position: relative;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 32px 48px;
+  }
+
+  .event-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(57,211,83,0.1);
+    border: 1px solid rgba(57,211,83,0.3);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 3px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 rgba(57,211,83,0); }
+    50% { box-shadow: 0 0 12px rgba(57,211,83,0.25); }
+  }
+
+  .event-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--green);
+    animation: blink 1.2s step-end infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(28px, 5vw, 46px);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--white);
+    margin-bottom: 12px;
+  }
+
+  h1 span {
+    color: var(--green);
+    text-shadow: 0 0 30px rgba(57,211,83,0.5);
+  }
+
+  .subtitle {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    margin-bottom: 32px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 3px;
+    border: 1px solid;
+    letter-spacing: 0.08em;
+  }
+
+  .tag-rev { color: var(--cyan); border-color: rgba(88,215,247,0.3); background: rgba(88,215,247,0.07); }
+  .tag-easy { color: var(--green); border-color: rgba(57,211,83,0.3); background: rgba(57,211,83,0.07); }
+  .tag-adbctf { color: var(--yellow); border-color: rgba(240,224,64,0.3); background: rgba(240,224,64,0.07); }
+
+  /* Main content */
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 48px;
+    animation: fade-up 0.5s ease both;
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .section:nth-child(2) { animation-delay: 0.1s; }
+  .section:nth-child(3) { animation-delay: 0.2s; }
+  .section:nth-child(4) { animation-delay: 0.3s; }
+  .section:nth-child(5) { animation-delay: 0.4s; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .section-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+    min-width: 28px;
+  }
+
+  h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: 0.05em;
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  p {
+    color: #adbac7;
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  /* Terminal block */
+  .terminal {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 20px 0;
+    position: relative;
+  }
+
+  .terminal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(57,211,83,0.02) 0%, transparent 40%);
+    pointer-events: none;
+  }
+
+  .terminal-bar {
+    background: #161b22;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #28c941; }
+
+  .terminal-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .terminal-body {
+    padding: 20px 22px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+
+  .t-prompt { color: var(--green); }
+  .t-path { color: var(--cyan); }
+  .t-cmd { color: var(--white); }
+  .t-comment { color: var(--muted); }
+  .t-info { color: #8b949e; }
+  .t-label { color: var(--yellow); }
+  .t-ok { color: var(--green); }
+  .t-flag { color: var(--green); font-weight: bold; text-shadow: 0 0 8px rgba(57,211,83,0.6); }
+  .t-head { color: var(--cyan); }
+  .t-section { color: #f78166; }
+  .t-border { color: #444d56; }
+  .t-tool { color: #d2a8ff; }
+
+  /* Info card */
+  .info-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 15px;
+    color: #adbac7;
+  }
+
+  .info-card strong { color: var(--white); }
+
+  /* Flag box */
+  .flag-box {
+    background: rgba(57,211,83,0.05);
+    border: 1px solid rgba(57,211,83,0.3);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin: 24px 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flag-box::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(57,211,83,0.06) 0%, transparent 70%);
+  }
+
+  .flag-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .flag-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(16px, 3vw, 22px);
+    color: var(--green);
+    text-shadow: 0 0 20px rgba(57,211,83,0.5);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+  }
+
+  /* Step cards */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+
+  .step:hover { border-color: rgba(57,211,83,0.3); }
+
+  .step-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    color: rgba(57,211,83,0.25);
+    min-width: 36px;
+    line-height: 1;
+    padding-top: 2px;
+  }
+
+  .step-content h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--white);
+    margin-bottom: 4px;
+    letter-spacing: 0.03em;
+  }
+
+  .step-content p {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  code {
+    font-family: 'Share Tech Mono', monospace;
+    background: rgba(57,211,83,0.08);
+    color: var(--green);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: gap;
+  }
+
+  .footer-left {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .footer-author {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+    letter-spacing: 0.08em;
+  }
+
+  /* Glow line top */
+  .glow-line {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), var(--cyan), transparent);
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-line"></div>
+
+<header>
+  <div class="header-bg"></div>
+  <div class="header-grid"></div>
+  <div class="header-inner">
+    <div class="event-badge">ADBCTF 2026</div>
+    <h1>Strings — <span>very-baby</span></h1>
+    <p class="subtitle">// WRITE UP &nbsp;•&nbsp; REVERSE ENGINEERING &nbsp;•&nbsp; BY egiluy</p>
+    <div class="meta-row">
+      <span class="tag tag-rev">Reverse Engineering</span>
+      <span class="tag tag-easy">Very Easy</span>
+      <span class="tag tag-adbctf">ADBCTF</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- DESCRIPTION -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2>Deskripsi Soal</h2>
+      <div class="section-line"></div>
+    </div>
+    <p>
+      Soal ini berada dalam kategori <strong>Reverse Engineering</strong> dengan deskripsi yang sangat singkat:
+    </p>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">challenge description</span>
+      </div>
+      <div class="terminal-body">
+        <span class="t-label">Title  :</span> <span class="t-cmd">Strings - very-baby</span><br>
+        <span class="t-label">Desc   :</span> <span class="t-cmd">Free flag for very-super-baby-rev?</span><br>
+        <span class="t-label">File   :</span> <span class="t-cmd">chall</span>
+      </div>
+    </div>
+    <div class="info-card">
+      Deskripsi soal mengisyaratkan bahwa flag dapat ditemukan dengan mudah — sebuah hint klasik untuk teknik <strong>strings analysis</strong> pada binary ELF.
+    </div>
+  </section>
+
+  <!-- ANALISIS FILE -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2>Analisis File</h2>
+      <div class="section-line"></div>
+    </div>
+    <p>
+      File yang diberikan bernama <code>chall</code> tanpa ekstensi. Langkah pertama adalah mengidentifikasi jenis file tersebut.
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">file identification</span>
+      </div>
+      <div class="terminal-body">
+        <span class="t-border">============================================================</span><br>
+        <span class="t-section">PROCESSING: chall</span><br>
+        <span class="t-border">============================================================</span><br><br>
+
+        <span class="t-ok">[+]</span> <span class="t-label">Entropy:</span> <span class="t-cmd">1.6039</span><br>
+        <span class="t-ok">[+]</span> <span class="t-label">Header :</span> <span class="t-cmd">7F 45 4C 46 02 01 01 00 00 00 00 00 00 00 00 00</span><br><br>
+
+        <span class="t-head">[METADATA]</span><br>
+        <span class="t-label">Type   :</span> <span class="t-cmd">ELF 64-bit LSB pie executable, x86-64</span><br>
+        <span class="t-label">Interp :</span> <span class="t-cmd">/lib64/ld-linux-x86-64.so.2</span><br>
+        <span class="t-label">Status :</span> <span class="t-cmd">dynamically linked, <span class="t-ok">not stripped</span></span><br>
+        <span class="t-label">BuildID:</span> <span class="t-cmd">5493fdb85f0e8e48b62b089eeff9a83ec5fefa2f</span>
+      </div>
+    </div>
+
+    <p>
+      Dari analisis header, diketahui bahwa file <code>chall</code> merupakan sebuah <strong>ELF 64-bit LSB executable</strong> untuk arsitektur x86-64 di Linux. Yang paling penting: file ini berstatus <strong>"not stripped"</strong>, artinya debug symbol masih tersedia dan string di dalam binary tidak dihapus.
+    </p>
+    <div class="info-card">
+      <strong>Entropy rendah (1.6039)</strong> juga menjadi indikator kuat bahwa binary ini tidak di-obfuscate maupun di-pack — kontennya mudah dibaca secara langsung.
+    </div>
+  </section>
+
+  <!-- TOOL & METODE -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2>Tools & Metode</h2>
+      <div class="section-line"></div>
+    </div>
+    <p>
+      Saya menggunakan custom tool buatan sendiri bernama <code>sfores</code> — sebuah automated forensic analyzer yang terinspirasi dari AperiSolve. Tool ini menggabungkan berbagai utilitas forensik dan binary analysis ke dalam satu pipeline otomatis.
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">sfores — tool availability check</span>
+      </div>
+      <div class="terminal-body">
+        <span class="t-border">==================================================</span><br>
+        <span class="t-section">   FORENSIC TOOLS v2.0 — AperiSolve Style</span><br>
+        <span class="t-border">==================================================</span><br><br>
+
+        <span class="t-tool">[TOOL]</span> <span class="t-label">zsteg    :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">steghide :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">foremost :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">pngcheck :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">exiftool :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">binwalk  :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">identify :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">tshark   :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">tcpdump  :</span> <span class="t-ok">Available</span><br>
+        <span class="t-tool">[TOOL]</span> <span class="t-label">capinfos :</span> <span class="t-ok">Available</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- EKSEKUSI -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2>Eksekusi & Penyelesaian</h2>
+      <div class="section-line"></div>
+    </div>
+    <p>
+      Cukup jalankan <code>sfores</code> dengan file <code>chall</code> sebagai argumen. Tool secara otomatis melakukan scanning menyeluruh, dan langsung menemukan flag pada tahap analisis binary awal.
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">bash — egiluy@DESKTOP-02A7848</span>
+      </div>
+      <div class="terminal-body">
+        <span class="t-prompt">┌──(egiluy㉿DESKTOP-02A7848)-[</span><span class="t-path">/mnt/c/.../Strings</span><span class="t-prompt">]</span><br>
+        <span class="t-prompt">└─$ </span><span class="t-cmd">sfores chall</span><br><br>
+
+        <span class="t-info">[INFO] Found 1 file(s) to analyze.</span><br>
+        <span class="t-info">[BASIC] ELF 64-bit LSB pie executable, x86-64 ... not stripped</span><br><br>
+
+        <span class="t-ok">[EARLY EXIT]</span> <span class="t-cmd">Flag found! Signaling stop...</span><br>
+        <span class="t-comment">[BINWALK] Skipping - flag already found</span><br><br>
+
+        <span class="t-border">============================================================</span><br>
+        <span class="t-head">📋 FINAL REPORT: chall</span><br>
+        <span class="t-border">============================================================</span><br>
+        <span class="t-section">🚩 FLAGS FOUND (1):</span><br>
+        <span class="t-border">--------------------------------------------------</span><br>
+        <span class="t-cmd">  1. </span><span class="t-flag">ADB{ah_yes_classic_strings!}</span><br><br>
+        <span class="t-border">📊 SUMMARY:</span><br>
+        <span class="t-border">--------------------------------------------------</span><br>
+        <span class="t-info">  Total Findings : 2</span><br>
+        <span class="t-info">  Flags Found    : 1</span><br>
+        <span class="t-info">  Files Extracted: 0</span><br>
+        <span class="t-border">============================================================</span>
+      </div>
+    </div>
+
+    <p>Tool langsung berhenti (<em>early exit</em>) begitu flag ditemukan, tanpa perlu melanjutkan analisis lebih jauh seperti binwalk atau steghide.</p>
+  </section>
+
+  <!-- PENJELASAN TEKNIS -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2>Penjelasan Teknis</h2>
+      <div class="section-line"></div>
+    </div>
+    <p>
+      Secara teknis, soal ini menguji pemahaman dasar tentang format binary ELF. Flag disimpan sebagai <strong>plaintext string</strong> di dalam binary — sebuah teknik yang paling umum dijumpai pada soal Reverse Engineering tingkat pemula.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Binary Tidak Di-strip</h3>
+          <p>File berstatus <code>not stripped</code>, artinya semua string literal — termasuk flag — masih dapat dibaca langsung dari segmen <code>.rodata</code> atau <code>.data</code> pada binary.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Entropy Sangat Rendah</h3>
+          <p>Nilai entropy <code>1.6039</code> jauh di bawah threshold packing/obfuscation (~7.0+). Ini mengkonfirmasi binary tidak diproteksi dengan UPX, XOR, atau teknik encoding apapun.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Strings Analysis</h3>
+          <p>Teknik <code>strings</code> bekerja dengan mengekstrak semua sequence karakter ASCII yang dapat dibaca dari binary. Flag format <code>LKS{...}</code> terdeteksi secara langsung.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Auto-Fix ELF Header</h3>
+          <p>Tool <code>sfores</code> juga melakukan auto-fix pada header ELF (output: <code>fixed_chall.elf</code>), namun tidak diperlukan untuk mendapatkan flag karena strings sudah berhasil diekstrak.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- FLAG -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2>Flag</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="flag-box">
+      <div class="flag-label">🚩 captured flag</div>
+      <div class="flag-value">ADB{ah_yes_classic_strings!}</div>
+    </div>
+
+    <div class="info-card">
+      <strong>Lesson learned:</strong> Selalu cek strings pada binary ELF terlebih dahulu sebelum melakukan analisis yang lebih kompleks. Soal "very-baby" seperti ini sering kali menyembunyikan flag langsung di dalam binary tanpa enkripsi atau obfuscation apapun.
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footer-left">ADBCTF &nbsp;•&nbsp; Reverse Engineering &nbsp;•&nbsp; Strings: very-baby</div>
+  <div class="footer-author">by egiluy</div>
+</footer>
+
+</body>
+</html>
